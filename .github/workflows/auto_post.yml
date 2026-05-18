@@ -12,6 +12,8 @@ on:
 jobs:
   publish-post:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       # Step 1: Check out code from GitHub
