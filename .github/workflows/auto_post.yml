@@ -1,0 +1,54 @@
+name: Auto Publish Movie Carousel to Facebook
+
+on:
+  schedule:
+    # Schedules cron to run three times a day at optimal times:
+    # 5:00 AM UTC  = 10:00 AM PKT (between 9:00 AM – 11:00 AM)
+    # 9:00 AM UTC  = 2:00 PM PKT (between 1:00 PM – 3:00 PM)
+    # 3:00 PM UTC  = 8:00 PM PKT (between 7:00 PM – 9:00 PM)
+    - cron: '0 5,9,15 * * *'
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions tab
+
+jobs:
+  publish-post:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out code from GitHub
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 2: Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+
+      # Step 3: Install dependencies
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests sqlite3 pandas
+
+      # Step 4: Run the Facebook auto-publish script
+      - name: Run Publish Script
+        env:
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+          # Passing TMDB_API_TOKEN as an environment variable in case the one in pipeline.py needs to be overridden
+          TMDB_API_TOKEN: ${{ secrets.TMDB_API_TOKEN }}
+        run: python publish_to_facebook.py
+
+      # Step 5: Commit the updated SQLite database back to GitHub
+      # This is crucial so that state (which movies have been posted) persists across workflow runs!
+      - name: Commit and Push DB Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add facebook_history.db
+          # Only commit and push if there are actual database modifications
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: auto-update posted movies database state" && git push origin main)
