@@ -161,15 +161,14 @@ def publish_facebook_post(message, photo_ids):
     """Publishes a multi-photo post on the Facebook Page using attached photo IDs."""
     url = f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/feed"
     
+    # Format attached media list correctly for Facebook Graph API
+    attached_media = [{"media_fbid": pid} for pid in photo_ids]
+    
     payload = {
         "message": message,
+        "attached_media": str(attached_media).replace("'", '"'),  # Valid JSON double quotes
         "access_token": FB_PAGE_ACCESS_TOKEN
     }
-    
-    # Format attached media list correctly as indexed form parameters for strict compliance
-    for idx, pid in enumerate(photo_ids):
-        payload[f"attached_media[{idx}]"] = f'{{"media_fbid":"{pid}"}}'
-        
     try:
         response = requests.post(url, data=payload, timeout=20)
         if response.status_code == 200:
