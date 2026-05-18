@@ -5,10 +5,23 @@ import re
 import sys
 from typing import List, Dict, Any
 
+import os
+
+# --- Load Environment Variables ---
+def load_env():
+    if os.path.exists(".env"):
+        with open(".env", "r") as f:
+            for line in f:
+                if "=" in line and not line.strip().startswith("#"):
+                    key, val = line.strip().split("=", 1)
+                    os.environ[key.strip()] = val.strip().strip('"').strip("'")
+
+load_env()
+
 # --- Configuration ---
-YOUTUBE_TRANSCRIPTS_API_KEY = "ac6eab7af3mshb76f329520376abp1de914jsne60da10d035d"
+YOUTUBE_TRANSCRIPTS_API_KEY = os.environ.get("YOUTUBE_TRANSCRIPTS_API_KEY", "")
 YOUTUBE_TRANSCRIPTS_HOST = "youtube-transcripts.p.rapidapi.com"
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_HOST = "openrouter.ai"
 DB_PATH = "facebook_history.db"  # Reuse same database as pipeline.py
 
