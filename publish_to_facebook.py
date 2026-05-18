@@ -10,6 +10,37 @@ DB_PATH = "facebook_history.db"
 FB_PAGE_ID = os.environ.get("FB_PAGE_ID")
 FB_PAGE_ACCESS_TOKEN = os.environ.get("FB_PAGE_ACCESS_TOKEN")
 
+# --- Load Environment Variables ---
+def load_env():
+    if os.path.exists(".env"):
+        with open(".env", "r") as f:
+            for line in f:
+                if "=" in line and not line.strip().startswith("#"):
+                    key, val = line.strip().split("=", 1)
+                    os.environ[key.strip()] = val.strip().strip('"').strip("'")
+
+# Ensure environment variables are loaded first
+load_env()
+FB_PAGE_ACCESS_TOKEN = os.environ.get("FB_PAGE_ACCESS_TOKEN")
+FB_PAGE_ID = os.environ.get("FB_PAGE_ID")
+
+def get_fb_page_id():
+    """Automatically queries the Meta Graph API to resolve the Page ID from the Page Access Token."""
+    if not FB_PAGE_ACCESS_TOKEN:
+        return None
+    url = f"https://graph.facebook.com/v19.0/me?access_token={FB_PAGE_ACCESS_TOKEN}"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            pid = response.json().get("id")
+            print(f"[FB Setup] Successfully auto-resolved FB Page ID from token: {pid}")
+            return pid
+        else:
+            print(f"[FB Setup] Failed to resolve Page ID: {response.text}")
+    except Exception as e:
+        print(f"[FB Setup] Error auto-resolving Page ID: {e}")
+    return None
+
 def search_tmdb_by_title(title):
     # Clean up title (remove year like "(2024)" if present)
     clean_title = re.sub(r'\s*\(\d{4}\)\s*', '', title).strip()
@@ -149,9 +180,15 @@ def publish_facebook_post(message, photo_ids):
     return None
 
 def main():
+    global FB_PAGE_ID
+    
     # 1. Initialize databases
     init_pipeline_db()
     init_transcript_db()
+
+    # Auto-resolve FB Page ID if not provided in environment
+    if not FB_PAGE_ID:
+        FB_PAGE_ID = get_fb_page_id()
 
     if not FB_PAGE_ID or not FB_PAGE_ACCESS_TOKEN:
         print("[Error] FB_PAGE_ID or FB_PAGE_ACCESS_TOKEN environment variables not set. Exiting.")
@@ -167,6 +204,7 @@ def main():
         # Enrich with details
         details = fetch_tmdb_details(movie_data['tmdb_id'])
         movie_data['overview'] = details.get('overview') or "A remarkable film recommendation for tonight."
+        movie_data['genres'] = details.get('genres', [])
         movie_data['poster_url'] = details.get('poster_url')
         movie_data['screenshot_urls'] = fetch_tmdb_screenshots(movie_data['tmdb_id'], count=5)
     else:
@@ -179,6 +217,7 @@ def main():
         # Enrich API movie details
         details = fetch_tmdb_details(movie_data['tmdb_id'])
         movie_data['poster_url'] = details.get('poster_url')
+        movie_data['genres'] = details.get('genres', [])
         movie_data['screenshot_urls'] = fetch_tmdb_screenshots(movie_data['tmdb_id'], count=5)
         if not movie_data.get('overview'):
             movie_data['overview'] = details.get('overview') or "A trending must-watch movie."
@@ -192,10 +231,18 @@ def main():
 
     print(f"[Pipeline] Preparing multi-photo post for '{movie_data['title']}'...")
     
-    # 3. Formulate message caption
-    message = f"📣 Film Recommendation: {movie_data['title']}\n\n{movie_data['overview']}\n\n#MovieRecommendation #Filmden #Cinema"
+    # 3. Formulate message caption matching user style requirements
+    genres_list = movie_data.get('genres', [])
+    genres_str = ", ".join(genres_list) if genres_list else "N/A"
     
-    # 4. Upload photo assets to Facebook Page album
+    message = (
+        f"🎬 Film Recommendation: {movie_data['title']}\n"
+        f"🏷️ Genre: {genres_str}\n\n"
+        f"🍿 Summary:\n{movie_data['overview']}\n\n"
+        f"#movies #movieslist #movietowatch #filmden #cinema #cinephile #mustwatch"
+    )
+    
+    # 4. Upload photo assets to Facebook Page album (Poster first, then screenshots)
     photo_ids = []
     
     # Upload poster

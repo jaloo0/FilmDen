@@ -99,16 +99,17 @@ def fetch_trakt_trending(limit: int = 20) -> list:
 
 def fetch_tmdb_details(tmdb_id: int) -> dict:
     """
-    Fetches movie details (overview, poster) from TMDB.
-    Returns a dict with 'overview' and 'poster_url', or empty values on failure.
+    Fetches movie details (overview, poster, genres) from TMDB.
+    Returns a dict with 'overview', 'poster_url', and 'genres', or empty values on failure.
     """
-    result = {"overview": None, "poster_url": None}
+    result = {"overview": None, "poster_url": None, "genres": []}
     url = f"https://api.themoviedb.org/3/movie/{tmdb_id}?language=en-US&api_key={TMDB_API_TOKEN}"
     try:
         response = requests.get(url, headers=HEADERS_TMDB, timeout=10)
         if response.status_code == 200:
             data = response.json()
             result["overview"] = data.get("overview") or None
+            result["genres"] = [g['name'] for g in data.get('genres', [])]
             poster_path = data.get("poster_path")
             result["poster_url"] = (
                 f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
